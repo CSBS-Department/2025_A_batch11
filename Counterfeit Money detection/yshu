@@ -1,0 +1,71 @@
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+
+def bwareaopen(img, min_size, connectivity=8):
+    # Find all connected components (called here "labels")
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        img, connectivity=connectivity)
+
+    # check size of all connected components (area in pixels)
+    for i in range(1, num_labels):  # excluding background
+        label_size = stats[i, cv2.CC_STAT_AREA]
+        # remove connected components smaller than min_size
+        if label_size < min_size:
+            img[labels == i] = 0
+
+    return img
+
+def corr2(A, B):
+    # Rowwise mean of input arrays & subtract from input arrays themselves
+    A_mA = A - A.mean(1)[:, None]
+    B_mB = B - B.mean(1)[:, None]
+
+    # Sum of squares across rows
+    ssA = (A_mA**2).sum(1)
+    ssB = (B_mB**2).sum(1)
+
+    # Finally get corr coeff
+    return np.dot(A_mA, B_mB.T) / np.sqrt(np.dot(ssA[:, None], ssB[None]))
+
+# Read images
+A = cv2.imread('real.jpg')
+P = cv2.imread('fake.jpg')
+
+# Convert to grayscale
+a = cv2.cvtColor(A, cv2.COLOR_BGR2GRAY)
+p = cv2.cvtColor(P, cv2.COLOR_BGR2GRAY)
+
+# Extract regions of interest
+a2_str = a[5:1100, 2080:2151]
+p2_str = p[5:1100, 1666:1729]
+
+# Thresholding
+_, binr = cv2.threshold(a2_str, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+_, binr2 = cv2.threshold(p2_str, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+
+# Morphological operations
+kernel = np.ones((3, 3), np.uint8)
+BWImageCloseReal = cv2.morphologyEx(binr, cv2.MORPH_GRADIENT, kernel)
+BWImageCloseFake = cv2.morphologyEx(binr2, cv2.MORPH_GRADIENT, kernel)
+
+# Remove small noise
+areaopenReal = bwareaopen(BWImageCloseReal.copy(), 15)
+areaopenFake = bwareaopen(BWImageCloseFake.copy(), 15)
+
+# Connected component analysis
+_, labelsReal, statsReal, _ = cv2.connectedComponentsWithStats(areaopenReal, connectivity=8)
+_, labelsFake, statsFake, _ = cv2.connectedComponentsWithStats(areaopenFake, connectivity=8)
+
+# Correlation calculation
+co = corr2(a2_str, p2_str)
+
+if np.max(co) >= 0.5:
+    print('Correlation of transparent Gandhi > 0.5')
+    if statsReal.shape[0] == statsFake.shape[0]:
+        print('Currency is legitimate')
+    else:
+        print('Green strip is fake')
+else:
+    print('Correlation of transparent Gandhi < 0.5')
+    print('Currency is fake')
