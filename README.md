@@ -1,3 +1,3 @@
-# Mini_Project-
-MoneyVision:The counterfeit money deduction.
+# Money_Vision
+The Counterfeit Money deduction:
 Image Processing-based Currency Verification and Fraud Detection
